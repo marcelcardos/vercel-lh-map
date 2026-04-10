@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { HTML_TEMPLATE_DIT } from "./html_template_dit";
-import { BQ_QUERY_DIT_ROUTES, BQ_QUERY_DIT_SHIPMENTS, BQ_QUERY_DIT_STEPS } from "./data_query_dit";
-import { runBigQuery } from "./bq_client";
+import { BQ_QUERY_DIT_ROUTES, BQ_QUERY_DIT_SHIPMENTS, BQ_QUERY_DIT_STEPS } from "./lib/queries_dit";
+import { runBigQuery } from "./lib/bq_client";
 
 const DIT_META_PERC = 0.43;
 

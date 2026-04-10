@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { HTML_TEMPLATE } from "./html_template";
-import { BQ_QUERY_LH_ROUTES, BQ_QUERY_LH_TRACKING } from "./data_query";
-import { runBigQuery } from "./bq_client";
+import { BQ_QUERY_LH_ROUTES, BQ_QUERY_LH_TRACKING } from "./lib/queries_lh";
+import { runBigQuery } from "./lib/bq_client";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
