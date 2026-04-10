@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@keyframes slide {
+  0%   { transform: translateX(-200%); }
+  100% { transform: translateX(350%); }
+}
