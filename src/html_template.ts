@@ -220,7 +220,7 @@ export const HTML_TEMPLATE = `<!DOCTYPE html>
   }
   #ck-tooltip.show { opacity:1; }
   @keyframes spin-refresh { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-  #btnRefresh { display: inline-block; transform-origin: center; transition: color 0.2s; }
+  #btnRefreshIcon { display: inline-block; transform-origin: center; transition: color 0.2s; }
 </style>
 </head>
 <body>
@@ -513,7 +513,7 @@ L.Control.InfoBar = L.Control.extend({
       + '<span id="next-ctrl" style="white-space:nowrap;color:#f59e0b;font-weight:600">--</span>'
       + '<button onclick="requestRefresh()" id="btnRefresh" title="Atualizar dados" '
       + 'style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:2px 7px;'
-      + 'cursor:pointer;font-size:13px;color:#475569;line-height:1">↻</button>'
+      + 'cursor:pointer;font-size:13px;color:#475569;line-height:1"><span id="btnRefreshIcon" style="display:inline-block">↻</span></button>'
       + '<button onclick="togglePanel()" id="btnPanel" title="Mostrar/ocultar painel" '
       + 'style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:2px 8px;'
       + 'cursor:pointer;font-size:12px;color:#475569;white-space:nowrap">⌃ Painel</button>';
@@ -3382,12 +3382,10 @@ try {
 
 // ── Refresh silencioso via postMessage do React ────────────────────────────
 function requestRefresh() {
+  var icon = document.getElementById('btnRefreshIcon');
+  if (icon) { icon.style.color = '#3b82f6'; icon.style.animation = 'spin-refresh 0.8s linear infinite'; }
   var btn = document.getElementById('btnRefresh');
-  if (btn) {
-    btn.style.color = '#3b82f6';
-    btn.style.animation = 'spin-refresh 0.8s linear infinite';
-    btn.style.pointerEvents = 'none';
-  }
+  if (btn) btn.style.pointerEvents = 'none';
   window.parent.postMessage({ type: 'LH_REFRESH' }, '*');
 }
 
@@ -3403,8 +3401,10 @@ window.addEventListener('message', function(e) {
       var el2 = document.getElementById('ts');       if (el2) el2.textContent = 'Atualizado: ' + _t;
     }
     // Re-habilita botão ↻
+    var icon = document.getElementById('btnRefreshIcon');
+    if (icon) { icon.style.color = ''; icon.style.animation = ''; }
     var btn = document.getElementById('btnRefresh');
-    if (btn) { btn.style.color = ''; btn.style.animation = ''; btn.style.pointerEvents = ''; }
+    if (btn) btn.style.pointerEvents = '';
     // Mostra badge "Atualizado" por 3s
     var badge = document.getElementById('refresh-badge');
     if (badge) { badge.style.display = 'flex'; setTimeout(function(){ badge.style.display = 'none'; }, 3000); }
