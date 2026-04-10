@@ -75,6 +75,7 @@ export default function LHMap() {
   const blobUrlRef     = useRef<string | null>(null);
   const lastDatesRef   = useRef<{ dateFrom: string; dateTo: string }>({ dateFrom: today(), dateTo: today() });
   const refreshingRef  = useRef(false);
+  const cacheRef       = useRef<Map<string, { rows: Record<string, unknown>[]; tracking: Record<string, unknown[]>; generatedAt: string }>>(new Map());
 
   // Animate dots while loading
   useEffect(() => {
@@ -90,6 +91,34 @@ export default function LHMap() {
     const id = setInterval(() => setProgress((p) => p < 88 ? p + (88 - p) * 0.025 : p), 200);
     return () => clearInterval(id);
   }, [loading]);
+
+  const buildTrackingMap = (trackingRows: { SHP_LG_ROUTE_ID: string; LAT: string; LNG: string; TS_HM: string; SPD: string; SEG: string }[]) => {
+    const m: Record<string, unknown[]> = {};
+    for (const p of trackingRows) {
+      const rid = String(p.SHP_LG_ROUTE_ID);
+      if (!m[rid]) m[rid] = [];
+      m[rid].push({ lat: parseFloat(p.LAT), lng: parseFloat(p.LNG), ts: p.TS_HM, spd: parseFloat(p.SPD ?? "0"), seg: parseInt(p.SEG ?? "1") });
+    }
+    return m;
+  };
+
+  const prefetchPastDays = async () => {
+    const base = new Date();
+    for (let i = 1; i <= 5; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      if (cacheRef.current.has(dateStr)) continue;
+      try {
+        const rows = await runBigQuery<Record<string, unknown>>(BQ_QUERY_LH_ROUTES(dateStr, dateStr));
+        const trackingRows = await runBigQuery<{ SHP_LG_ROUTE_ID: string; LAT: string; LNG: string; TS_HM: string; SPD: string; SEG: string }>(
+          BQ_QUERY_LH_TRACKING(dateStr, dateStr)
+        ).catch(() => []);
+        const generatedAt = new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
+        cacheRef.current.set(dateStr, { rows, tracking: buildTrackingMap(trackingRows), generatedAt });
+      } catch { /* prefetch silencioso */ }
+    }
+  };
 
   const refreshData = async () => {
     if (refreshingRef.current || loading || !iframeRef.current?.contentWindow) return;
@@ -145,23 +174,16 @@ export default function LHMap() {
         BQ_QUERY_LH_TRACKING(dateFrom, dateTo)
       ).catch(() => []); // tracking é opcional
 
-      const trackingData: Record<string, unknown[]> = {};
-      for (const p of trackingRows) {
-        const rid = String(p.SHP_LG_ROUTE_ID);
-        if (!trackingData[rid]) trackingData[rid] = [];
-        trackingData[rid].push({
-          lat: parseFloat(p.LAT),
-          lng: parseFloat(p.LNG),
-          ts:  p.TS_HM,
-          spd: parseFloat(p.SPD ?? "0"),
-          seg: parseInt(p.SEG ?? "1"),
-        });
-      }
+      const trackingData = buildTrackingMap(trackingRows);
 
       // sv-SE gives "YYYY-MM-DD HH:MM:SS" — .slice(11,16) in template extracts "HH:MM" correctly
       const generatedAt = new Date().toLocaleString("sv-SE", {
         timeZone: "America/Sao_Paulo",
       }).slice(0, 16);
+
+      // Cache this result for instant date switching
+      if (dateFrom === dateTo) cacheRef.current.set(dateFrom, { rows, tracking: trackingData, generatedAt });
+
       const html = HTML_TEMPLATE
         .replace("__DATA_JSON__",     JSON.stringify(rows))
         .replace("__INMET_JSON__",    "[]")
@@ -187,15 +209,26 @@ export default function LHMap() {
   };
 
   useEffect(() => {
-    loadMap(today(), today());
+    loadMap(today(), today()).then(() => prefetchPastDays());
     return () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle messages from the template iframe
   useEffect(() => {
     const handle = (e: MessageEvent) => {
       if (e.data?.type === "LH_RELOAD" && e.data.dateFrom && e.data.dateTo) {
-        loadMap(e.data.dateFrom as string, e.data.dateTo as string);
+        const { dateFrom, dateTo } = e.data as { dateFrom: string; dateTo: string };
+        // Single-day: try cache first → instant, no loading screen
+        if (dateFrom === dateTo && cacheRef.current.has(dateFrom) && iframeRef.current?.contentWindow) {
+          const cached = cacheRef.current.get(dateFrom)!;
+          lastDatesRef.current = { dateFrom, dateTo };
+          iframeRef.current.contentWindow.postMessage(
+            { type: "LH_DATA_UPDATE", routes: cached.rows, tracking: cached.tracking, generatedAt: cached.generatedAt },
+            "*"
+          );
+        } else {
+          loadMap(dateFrom, dateTo);
+        }
       } else if (e.data?.type === "LH_REFRESH") {
         refreshData();
       }
