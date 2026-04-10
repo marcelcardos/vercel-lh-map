@@ -79,17 +79,44 @@ async function getAccessToken(): Promise<string> {
   return cachedToken!;
 }
 
-function parseRows<T>(resp: Record<string, unknown>): T[] {
-  const fields = (resp?.schema as Record<string, unknown[]> | undefined)?.fields ?? [];
-  const rows = (resp?.rows as unknown[]) ?? [];
+type BQResponse = {
+  schema?: { fields: Array<{ name: string }> };
+  rows?: Array<{ f: Array<{ v: unknown }> }>;
+  pageToken?: string;
+  jobComplete?: boolean;
+  jobReference?: { jobId: string };
+  status?: { errorResult?: { message: string } };
+};
+
+function extractRows<T>(json: BQResponse): T[] {
+  const fields = json.schema?.fields ?? [];
+  const rows = json.rows ?? [];
   return rows.map((row) =>
-    Object.fromEntries(
-      (fields as Array<{ name: string }>).map((f, i) => [
-        f.name,
-        ((row as { f: Array<{ v: unknown }> }).f[i])?.v ?? null,
-      ])
-    )
+    Object.fromEntries(fields.map((f, i) => [f.name, row.f[i]?.v ?? null]))
   ) as T[];
+}
+
+async function fetchAllPages<T>(
+  token: string,
+  projectId: string,
+  jobId: string,
+  firstPage: BQResponse
+): Promise<T[]> {
+  const all: T[] = extractRows<T>(firstPage);
+  let pageToken = firstPage.pageToken;
+
+  while (pageToken) {
+    const url =
+      `https://bigquery.googleapis.com/bigquery/v2/projects/${projectId}` +
+      `/queries/${jobId}?maxResults=100000&pageToken=${encodeURIComponent(pageToken)}`;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!resp.ok) throw new Error(`BigQuery page error ${resp.status}`);
+    const page: BQResponse = await resp.json();
+    all.push(...extractRows<T>(page));
+    pageToken = page.pageToken;
+  }
+
+  return all;
 }
 
 export async function runBigQuery<T>(sql: string): Promise<T[]> {
@@ -119,14 +146,15 @@ export async function runBigQuery<T>(sql: string): Promise<T[]> {
     throw new Error(`BigQuery error ${resp.status}: ${err.slice(0, 300)}`);
   }
 
-  const json = await resp.json();
+  const json: BQResponse = await resp.json();
 
   if (json.status?.errorResult) {
     throw new Error(json.status.errorResult.message);
   }
 
   if (json.jobComplete) {
-    return parseRows<T>(json);
+    const jobId = json.jobReference?.jobId ?? "";
+    return fetchAllPages<T>(token, projectId, jobId, json);
   }
 
   // Job still running — poll
@@ -143,8 +171,10 @@ export async function runBigQuery<T>(sql: string): Promise<T[]> {
       const err = await pollResp.text();
       throw new Error(`BigQuery poll error: ${err.slice(0, 200)}`);
     }
-    const pollJson = await pollResp.json();
-    if (pollJson.jobComplete) return parseRows<T>(pollJson);
+    const pollJson: BQResponse = await pollResp.json();
+    if (pollJson.jobComplete) {
+      return fetchAllPages<T>(token, projectId, jobId, pollJson);
+    }
   }
 
   throw new Error("BigQuery timeout após 2 minutos");
