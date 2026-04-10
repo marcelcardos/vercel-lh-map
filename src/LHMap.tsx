@@ -140,7 +140,10 @@ export default function LHMap() {
         });
       }
 
-      const generatedAt = new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
+      const tableUpd2 = rows.length > 0 ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "") : "";
+      const generatedAt = tableUpd2.length >= 16
+        ? tableUpd2.slice(0, 16)
+        : new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
       iframeRef.current?.contentWindow?.postMessage(
         { type: "LH_DATA_UPDATE", routes: rows, tracking: trackingData, generatedAt,
           loadedFrom: dateFrom, loadedTo: dateTo },
@@ -177,10 +180,11 @@ export default function LHMap() {
 
       const trackingData = buildTrackingMap(trackingRows);
 
-      // sv-SE gives "YYYY-MM-DD HH:MM:SS" — .slice(11,16) in template extracts "HH:MM" correctly
-      const generatedAt = new Date().toLocaleString("sv-SE", {
-        timeZone: "America/Sao_Paulo",
-      }).slice(0, 16);
+      // Use MAX(AUD_UPD_DTTM) from the table — shows when the pipeline last ran, not when browser fetched
+      const tableUpd = rows.length > 0 ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "") : "";
+      const generatedAt = tableUpd.length >= 16
+        ? tableUpd.slice(0, 16)   // BQ returns "YYYY-MM-DD HH:MM:SS"
+        : new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
 
       // Cache this result for instant date switching
       if (dateFrom === dateTo) cacheRef.current.set(dateFrom, { rows, tracking: trackingData, generatedAt });
