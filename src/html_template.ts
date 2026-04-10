@@ -493,6 +493,8 @@ let RAW_DATA      = __DATA_JSON__;
 const INMET_ALERTS  = __INMET_JSON__;
 let TRACKING_DATA = __TRACKING_JSON__;   // { "routeId": [{lat,lng,ts,spd},...] }
 let GENERATED_AT  = "__GENERATED_AT__";
+let LOADED_FROM   = "__LOADED_FROM__";   // date range that was queried in BigQuery
+let LOADED_TO     = "__LOADED_TO__";
 
 // ── Mapa ──────────────────────────────────────────────────────────────────────
 const BRAZIL_BOUNDS = L.latLngBounds(L.latLng(-38, -78), L.latLng(12, -24));
@@ -2385,13 +2387,12 @@ function applyFilters() {
   const dateFrom    = (document.getElementById('fDateFrom')||{value:''}).value;
   const dateTo      = (document.getElementById('fDateTo')||{value:''}).value;
 
-  // If selected date range has no data loaded, ask React parent to re-query BigQuery
-  if (dateFrom && dateTo && RAW_DATA.length > 0 && window.parent !== window) {
-    const hasMatch = RAW_DATA.some(function(r) {
-      var dt = String(r.ETA_DATE || '').slice(0,10);
-      return dt >= dateFrom && dt <= dateTo;
-    });
-    if (!hasMatch) {
+  // Reload if selected range extends beyond what was loaded from BigQuery
+  if (dateFrom && dateTo && window.parent !== window) {
+    const needsReload = RAW_DATA.length === 0
+      || dateFrom < LOADED_FROM
+      || dateTo   > LOADED_TO;
+    if (needsReload) {
       window.parent.postMessage({ type: 'LH_RELOAD', dateFrom: dateFrom, dateTo: dateTo }, '*');
       return;
     }
@@ -3346,8 +3347,8 @@ try {
     return d > max ? d : max;
   }, '');
   const defaultDate = latestDate || today;
-  const _ff = document.getElementById('fDateFrom'); if (_ff && !_ff.value) _ff.value = defaultDate;
-  const _ft = document.getElementById('fDateTo');   if (_ft && !_ft.value) _ft.value = defaultDate;
+  const _ff = document.getElementById('fDateFrom'); if (_ff && !_ff.value) _ff.value = LOADED_FROM || defaultDate;
+  const _ft = document.getElementById('fDateTo');   if (_ft && !_ft.value) _ft.value = LOADED_TO   || defaultDate;
   // Restaurar estado salvo antes do auto-reload (tab + filtros de data)
   var _restoredTab = 0;
   try {
@@ -3392,8 +3393,10 @@ function requestRefresh() {
 window.addEventListener('message', function(e) {
   if (!e.data || e.data.type !== 'LH_DATA_UPDATE') return;
   try {
-    if (e.data.routes)   { RAW_DATA = e.data.routes; }
-    if (e.data.tracking) { TRACKING_DATA = e.data.tracking; }
+    if (e.data.routes)     { RAW_DATA = e.data.routes; }
+    if (e.data.tracking)   { TRACKING_DATA = e.data.tracking; }
+    if (e.data.loadedFrom) { LOADED_FROM = e.data.loadedFrom; }
+    if (e.data.loadedTo)   { LOADED_TO   = e.data.loadedTo; }
     if (e.data.generatedAt) {
       GENERATED_AT = e.data.generatedAt;
       var _t = GENERATED_AT.slice(11,16);

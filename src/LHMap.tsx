@@ -142,7 +142,8 @@ export default function LHMap() {
 
       const generatedAt = new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
       iframeRef.current?.contentWindow?.postMessage(
-        { type: "LH_DATA_UPDATE", routes: rows, tracking: trackingData, generatedAt },
+        { type: "LH_DATA_UPDATE", routes: rows, tracking: trackingData, generatedAt,
+          loadedFrom: dateFrom, loadedTo: dateTo },
         "*"
       );
     } catch {
@@ -188,7 +189,9 @@ export default function LHMap() {
         .replace("__DATA_JSON__",     JSON.stringify(rows))
         .replace("__INMET_JSON__",    "[]")
         .replace("__TRACKING_JSON__", JSON.stringify(trackingData))
-        .replace("__GENERATED_AT__",  generatedAt);
+        .replace("__GENERATED_AT__",  generatedAt)
+        .replace("__LOADED_FROM__",   dateFrom)
+        .replace("__LOADED_TO__",     dateTo);
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
       const blob = new Blob([html], { type: "text/html; charset=utf-8" });
       const url  = URL.createObjectURL(blob);
