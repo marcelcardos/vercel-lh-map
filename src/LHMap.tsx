@@ -144,7 +144,7 @@ export default function LHMap() {
         ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "")
         : "";
       const generatedAt = rawUpd2.length >= 16
-        ? new Date(rawUpd2.replace(" ", "T") + "-04:00")
+        ? new Date(rawUpd2.replace(" ", "T") + "-03:00")
             .toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16)
         : new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
       iframeRef.current?.contentWindow?.postMessage(
@@ -189,7 +189,7 @@ export default function LHMap() {
         ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "")
         : "";
       const generatedAt = rawUpd.length >= 16
-        ? new Date(rawUpd.replace(" ", "T") + "-04:00")
+        ? new Date(rawUpd.replace(" ", "T") + "-03:00")
             .toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16)
         : new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
 
