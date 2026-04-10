@@ -3408,6 +3408,14 @@ window.addEventListener('message', function(e) {
     if (icon) { icon.style.color = ''; icon.style.animation = ''; }
     var btn = document.getElementById('btnRefresh');
     if (btn) btn.style.pointerEvents = '';
+    // Atualiza "Próx" para próximo slot de 5 min a partir de agora
+    try {
+      var _slot = 5 * 60 * 1000;
+      var _nextD2 = new Date(Date.now() + (_slot - (Date.now() % _slot)));
+      var _nextStr = 'Próx: ' + String(_nextD2.getHours()).padStart(2,'0') + ':' + String(_nextD2.getMinutes()).padStart(2,'0');
+      var _nu1 = document.getElementById('next-ctrl');   if (_nu1) _nu1.textContent = _nextStr;
+      var _nu2 = document.getElementById('next-update'); if (_nu2) _nu2.textContent = _nextStr;
+    } catch(e2) {}
     // Mostra badge "Atualizado" por 3s
     var badge = document.getElementById('refresh-badge');
     if (badge) { badge.style.display = 'flex'; setTimeout(function(){ badge.style.display = 'none'; }, 3000); }
