@@ -140,11 +140,12 @@ export default function LHMap() {
         });
       }
 
-      const tableUpd2 = rows.length > 0
-        ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "").replace("T", " ")
+      const rawUpd2 = rows.length > 0
+        ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "")
         : "";
-      const generatedAt = tableUpd2.length >= 16
-        ? tableUpd2.slice(0, 16)
+      const generatedAt = rawUpd2.length >= 16
+        ? new Date(rawUpd2.replace(" ", "T") + "-04:00")
+            .toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16)
         : new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
       iframeRef.current?.contentWindow?.postMessage(
         { type: "LH_DATA_UPDATE", routes: rows, tracking: trackingData, generatedAt,
@@ -182,13 +183,14 @@ export default function LHMap() {
 
       const trackingData = buildTrackingMap(trackingRows);
 
-      // Use MAX(AUD_UPD_DTTM) from the table — shows when the pipeline last ran, not when browser fetched
-      // BQ returns DATETIME as "YYYY-MM-DDTHH:MM:SS" — replace T with space so slice(11,16) gives "HH:MM"
-      const tableUpd = rows.length > 0
-        ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "").replace("T", " ")
+      // Use MAX(AUD_UPD_DTTM) — stored as UTC-4 (job uses CURRENT_DATETIME('UTC-4'))
+      // SP is UTC-3 year-round since 2019 → parse as UTC-4 offset then convert to SP timezone
+      const rawUpd = rows.length > 0
+        ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "")
         : "";
-      const generatedAt = tableUpd.length >= 16
-        ? tableUpd.slice(0, 16)
+      const generatedAt = rawUpd.length >= 16
+        ? new Date(rawUpd.replace(" ", "T") + "-04:00")
+            .toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16)
         : new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
 
       // Cache this result for instant date switching
