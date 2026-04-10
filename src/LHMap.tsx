@@ -109,11 +109,10 @@ export default function LHMap() {
         });
       }
 
-      const generatedAt = new Date().toLocaleString("pt-BR", {
+      // sv-SE gives "YYYY-MM-DD HH:MM:SS" — .slice(11,16) in template extracts "HH:MM" correctly
+      const generatedAt = new Date().toLocaleString("sv-SE", {
         timeZone: "America/Sao_Paulo",
-        day: "2-digit", month: "2-digit", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-      });
+      }).slice(0, 16);
       const html = HTML_TEMPLATE
         .replace("__DATA_JSON__",     JSON.stringify(rows))
         .replace("__INMET_JSON__",    "[]")
@@ -134,6 +133,17 @@ export default function LHMap() {
   useEffect(() => {
     loadMap(today(), today());
     return () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); };
+  }, []);
+
+  // Reload when template requests different date range
+  useEffect(() => {
+    const handle = (e: MessageEvent) => {
+      if (e.data?.type === "LH_RELOAD" && e.data.dateFrom && e.data.dateTo) {
+        loadMap(e.data.dateFrom as string, e.data.dateTo as string);
+      }
+    };
+    window.addEventListener("message", handle);
+    return () => window.removeEventListener("message", handle);
   }, []);
 
   return (

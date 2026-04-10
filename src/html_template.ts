@@ -2378,6 +2378,18 @@ function applyFilters() {
   const tipo        = (document.getElementById('fTipo')||{value:''}).value;
   const dateFrom    = (document.getElementById('fDateFrom')||{value:''}).value;
   const dateTo      = (document.getElementById('fDateTo')||{value:''}).value;
+
+  // If selected date range has no data loaded, ask React parent to re-query BigQuery
+  if (dateFrom && dateTo && RAW_DATA.length > 0 && window.parent !== window) {
+    const hasMatch = RAW_DATA.some(function(r) {
+      var dt = String(r.ETA_DATE || '').slice(0,10);
+      return dt >= dateFrom && dt <= dateTo;
+    });
+    if (!hasMatch) {
+      window.parent.postMessage({ type: 'LH_RELOAD', dateFrom: dateFrom, dateTo: dateTo }, '*');
+      return;
+    }
+  }
   const ano         = (document.getElementById('fAno')||{value:''}).value;
   const trimestre   = (document.getElementById('fTrimestre')||{value:''}).value;
   const mes         = (document.getElementById('fMes')||{value:''}).value;
