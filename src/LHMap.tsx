@@ -69,12 +69,14 @@ function LoadingScreen({ step, dots }: { step: 1 | 2; dots: number }) {
 }
 
 export default function LHMap() {
-  const [loading, setLoading] = useState(false);
-  const [step, setStep]       = useState<1 | 2>(1);
-  const [dots, setDots]       = useState(0);
-  const [error, setError]     = useState<string | null>(null);
-  const iframeRef   = useRef<HTMLIFrameElement>(null);
-  const blobUrlRef  = useRef<string | null>(null);
+  const [loading, setLoading]       = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [step, setStep]             = useState<1 | 2>(1);
+  const [dots, setDots]             = useState(0);
+  const [error, setError]           = useState<string | null>(null);
+  const iframeRef      = useRef<HTMLIFrameElement>(null);
+  const blobUrlRef     = useRef<string | null>(null);
+  const lastDatesRef   = useRef<{ dateFrom: string; dateTo: string }>({ dateFrom: today(), dateTo: today() });
 
   // Animate dots while loading
   useEffect(() => {
@@ -83,7 +85,46 @@ export default function LHMap() {
     return () => clearInterval(id);
   }, [loading]);
 
+  const refreshData = async () => {
+    if (refreshing || loading || !iframeRef.current?.contentWindow) return;
+    setRefreshing(true);
+    try {
+      const { dateFrom, dateTo } = lastDatesRef.current;
+      const rows = await runBigQuery<Record<string, unknown>>(BQ_QUERY_LH_ROUTES(dateFrom, dateTo));
+      const trackingRows = await runBigQuery<{ SHP_LG_ROUTE_ID: string; LAT: string; LNG: string; TS_HM: string; SPD: string; SEG: string }>(
+        BQ_QUERY_LH_TRACKING(dateFrom, dateTo)
+      ).catch(() => []);
+
+      const trackingData: Record<string, unknown[]> = {};
+      for (const p of trackingRows) {
+        const rid = String(p.SHP_LG_ROUTE_ID);
+        if (!trackingData[rid]) trackingData[rid] = [];
+        trackingData[rid].push({
+          lat: parseFloat(p.LAT), lng: parseFloat(p.LNG),
+          ts: p.TS_HM, spd: parseFloat(p.SPD ?? "0"), seg: parseInt(p.SEG ?? "1"),
+        });
+      }
+
+      const generatedAt = new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "LH_DATA_UPDATE", routes: rows, tracking: trackingData, generatedAt },
+        "*"
+      );
+    } catch {
+      // silent — don't disrupt the UI on background refresh failure
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    const id = setInterval(() => { refreshData(); }, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const loadMap = async (dateFrom: string, dateTo: string) => {
+    lastDatesRef.current = { dateFrom, dateTo };
     setLoading(true);
     setStep(1);
     setDots(0);
@@ -182,6 +223,28 @@ export default function LHMap() {
           }}>Tentar novamente</button>
         </div>
       )}
+      {/* Manual refresh button — always visible when map is loaded */}
+      {!loading && !error && (
+        <button
+          onClick={refreshData}
+          disabled={refreshing}
+          title="Atualizar dados sem resetar filtros"
+          style={{
+            position: "absolute", top: 12, right: 12, zIndex: 1000,
+            background: refreshing ? "#1e293b" : "#1e293b",
+            border: "1px solid #334155", borderRadius: 8,
+            color: refreshing ? "#64748b" : "#94a3b8",
+            cursor: refreshing ? "default" : "pointer",
+            padding: "6px 12px", fontSize: 12, fontWeight: 600,
+            display: "flex", alignItems: "center", gap: 6,
+            transition: "all 0.2s",
+          }}
+        >
+          <span style={{ display: "inline-block", animation: refreshing ? "spin 1s linear infinite" : "none" }}>🔄</span>
+          {refreshing ? "Atualizando..." : "Atualizar dados"}
+        </button>
+      )}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       <iframe
         ref={iframeRef}
         style={{ width: "100%", height: "100%", border: "none", display: loading ? "none" : "block" }}
