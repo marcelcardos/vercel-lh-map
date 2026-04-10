@@ -124,7 +124,12 @@ export default function LHMap() {
       blobUrlRef.current = url;
       if (iframeRef.current) iframeRef.current.src = url;
     } catch (err: any) {
-      setError(err.message || "Erro ao carregar dados.");
+      const msg: string = err.message || "";
+      setError(
+        msg.includes("VPC Service Controls") || msg.includes("403")
+          ? "VPN_REQUIRED"
+          : msg || "Erro ao carregar dados."
+      );
     } finally {
       setLoading(false);
     }
@@ -155,9 +160,22 @@ export default function LHMap() {
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           background: "rgba(30,30,46,0.95)", color: "white", fontFamily: "Segoe UI, sans-serif", padding: 32,
         }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#ef4444", marginBottom: 8 }}>Erro ao carregar dados</div>
-          <div style={{ fontSize: 12, color: "#94a3b8", maxWidth: 500, textAlign: "center", wordBreak: "break-all" }}>{error}</div>
+          {error === "VPN_REQUIRED" ? (
+            <>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#FFE600", marginBottom: 8 }}>VPN necessária</div>
+              <div style={{ fontSize: 13, color: "#94a3b8", maxWidth: 400, textAlign: "center", lineHeight: 1.6 }}>
+                Este dashboard consulta o BigQuery diretamente pelo browser.<br />
+                Conecte a <strong style={{ color: "white" }}>VPN Meli</strong> e tente novamente.
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#ef4444", marginBottom: 8 }}>Erro ao carregar dados</div>
+              <div style={{ fontSize: 12, color: "#94a3b8", maxWidth: 500, textAlign: "center", wordBreak: "break-all" }}>{error}</div>
+            </>
+          )}
           <button onClick={() => loadMap(today(), today())} style={{
             marginTop: 20, background: "#FFE600", color: "#1e1e2e", border: "none",
             borderRadius: 6, padding: "8px 24px", fontWeight: 700, fontSize: 13, cursor: "pointer",
