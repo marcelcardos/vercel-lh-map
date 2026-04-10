@@ -436,6 +436,7 @@ export const HTML_TEMPLATE = `<!DOCTYPE html>
       <div class="update-info">
         <span class="update-badge update-last" id="ts"></span>
         <span class="update-badge update-next" id="next-update"></span>
+        <span id="refresh-badge" style="display:none;align-items:center;gap:4px;background:#22c55e;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;">🔄 Atualizado</span>
       </div>
     </div>
   </div>
@@ -486,10 +487,10 @@ export const HTML_TEMPLATE = `<!DOCTYPE html>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
 // ── Dados ─────────────────────────────────────────────────────────────────────
-const RAW_DATA      = __DATA_JSON__;
+let RAW_DATA      = __DATA_JSON__;
 const INMET_ALERTS  = __INMET_JSON__;
-const TRACKING_DATA = __TRACKING_JSON__;   // { "routeId": [{lat,lng,ts,spd},...] }
-const GENERATED_AT  = "__GENERATED_AT__";
+let TRACKING_DATA = __TRACKING_JSON__;   // { "routeId": [{lat,lng,ts,spd},...] }
+let GENERATED_AT  = "__GENERATED_AT__";
 
 // ── Mapa ──────────────────────────────────────────────────────────────────────
 const BRAZIL_BOUNDS = L.latLngBounds(L.latLng(-38, -78), L.latLng(12, -24));
@@ -508,6 +509,9 @@ L.Control.InfoBar = L.Control.extend({
       + 'box-shadow:0 2px 8px rgba(0,0,0,0.12);display:flex;align-items:center;gap:10px;cursor:default';
     div.innerHTML = '<span id="ts-ctrl" style="white-space:nowrap">--</span>'
       + '<span id="next-ctrl" style="white-space:nowrap;color:#f59e0b;font-weight:600">--</span>'
+      + '<button onclick="requestRefresh()" id="btnRefresh" title="Atualizar dados" '
+      + 'style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:2px 7px;'
+      + 'cursor:pointer;font-size:13px;color:#475569;line-height:1">↻</button>'
       + '<button onclick="togglePanel()" id="btnPanel" title="Mostrar/ocultar painel" '
       + 'style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:2px 8px;'
       + 'cursor:pointer;font-size:12px;color:#475569;white-space:nowrap">⌃ Painel</button>';
@@ -3326,16 +3330,7 @@ try {
     var _mm = String(_nextD.getMinutes()).padStart(2,'0');
     if (_nuEl) _nuEl.textContent = 'Próx: ' + _hh + ':' + _mm;
     if (_nuHdr) _nuHdr.textContent = 'Próx: ' + _hh + ':' + _mm;
-    setInterval(function() {
-      if (Date.now() >= _reloadAt) {
-        try {
-          localStorage.setItem('lhmap_tab', _currentTabIdx);
-          var _ffv = document.getElementById('fDateFrom'); if (_ffv) localStorage.setItem('lhmap_date_from', _ffv.value);
-          var _ftv = document.getElementById('fDateTo');   if (_ftv) localStorage.setItem('lhmap_date_to',   _ftv.value);
-        } catch(e) {}
-        window.location.reload();
-      }
-    }, 30000);
+    // Auto-refresh removido — dados são atualizados via postMessage pelo React
   } catch(e) {}
   const _cb = document.getElementById('climaBadge'); if (_cb) _cb.textContent = INMET_ALERTS.length || '?';
   const CANCELLED = ['CANCELLED', 'CANCELED'];
@@ -3382,6 +3377,34 @@ try {
 } catch(e) {
   window.onerror(e.message, 'init', 0, 0, e);
 }
+
+// ── Refresh silencioso via postMessage do React ────────────────────────────
+function requestRefresh() {
+  var btn = document.getElementById('btnRefresh');
+  if (btn) { btn.textContent = '↻'; btn.style.opacity = '0.4'; btn.style.pointerEvents = 'none'; }
+  window.parent.postMessage({ type: 'LH_REFRESH' }, '*');
+}
+
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'LH_DATA_UPDATE') return;
+  try {
+    if (e.data.routes)   { RAW_DATA = e.data.routes; }
+    if (e.data.tracking) { TRACKING_DATA = e.data.tracking; }
+    if (e.data.generatedAt) {
+      GENERATED_AT = e.data.generatedAt;
+      var _t = GENERATED_AT.slice(11,16);
+      var el1 = document.getElementById('ts-ctrl');  if (el1) el1.textContent = 'Atualizado: ' + _t;
+      var el2 = document.getElementById('ts');       if (el2) el2.textContent = 'Atualizado: ' + _t;
+    }
+    // Re-habilita botão ↻
+    var btn = document.getElementById('btnRefresh');
+    if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = ''; }
+    // Mostra badge "Atualizado" por 3s
+    var badge = document.getElementById('refresh-badge');
+    if (badge) { badge.style.display = 'flex'; setTimeout(function(){ badge.style.display = 'none'; }, 3000); }
+    applyFilters();
+  } catch(ex) { console.warn('LH_DATA_UPDATE error', ex); }
+});
 </script>
 
 <!-- Checkpoint Tooltip -->

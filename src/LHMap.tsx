@@ -69,14 +69,14 @@ function LoadingScreen({ step, dots }: { step: 1 | 2; dots: number }) {
 }
 
 export default function LHMap() {
-  const [loading, setLoading]       = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [step, setStep]             = useState<1 | 2>(1);
-  const [dots, setDots]             = useState(0);
-  const [error, setError]           = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [step, setStep]       = useState<1 | 2>(1);
+  const [dots, setDots]       = useState(0);
+  const [error, setError]     = useState<string | null>(null);
   const iframeRef      = useRef<HTMLIFrameElement>(null);
   const blobUrlRef     = useRef<string | null>(null);
   const lastDatesRef   = useRef<{ dateFrom: string; dateTo: string }>({ dateFrom: today(), dateTo: today() });
+  const refreshingRef  = useRef(false);
 
   // Animate dots while loading
   useEffect(() => {
@@ -86,8 +86,8 @@ export default function LHMap() {
   }, [loading]);
 
   const refreshData = async () => {
-    if (refreshing || loading || !iframeRef.current?.contentWindow) return;
-    setRefreshing(true);
+    if (refreshingRef.current || loading || !iframeRef.current?.contentWindow) return;
+    refreshingRef.current = true;
     try {
       const { dateFrom, dateTo } = lastDatesRef.current;
       const rows = await runBigQuery<Record<string, unknown>>(BQ_QUERY_LH_ROUTES(dateFrom, dateTo));
@@ -111,9 +111,11 @@ export default function LHMap() {
         "*"
       );
     } catch {
-      // silent — don't disrupt the UI on background refresh failure
+      // silent — don't disrupt UI on background refresh failure
+      // Re-enable the template button even on failure
+      iframeRef.current?.contentWindow?.postMessage({ type: "LH_DATA_UPDATE" }, "*");
     } finally {
-      setRefreshing(false);
+      refreshingRef.current = false;
     }
   };
 
@@ -181,16 +183,18 @@ export default function LHMap() {
     return () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); };
   }, []);
 
-  // Reload when template requests different date range
+  // Handle messages from the template iframe
   useEffect(() => {
     const handle = (e: MessageEvent) => {
       if (e.data?.type === "LH_RELOAD" && e.data.dateFrom && e.data.dateTo) {
         loadMap(e.data.dateFrom as string, e.data.dateTo as string);
+      } else if (e.data?.type === "LH_REFRESH") {
+        refreshData();
       }
     };
     window.addEventListener("message", handle);
     return () => window.removeEventListener("message", handle);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative", background: "#0f0f1a" }}>
@@ -223,28 +227,6 @@ export default function LHMap() {
           }}>Tentar novamente</button>
         </div>
       )}
-      {/* Manual refresh button — always visible when map is loaded */}
-      {!loading && !error && (
-        <button
-          onClick={refreshData}
-          disabled={refreshing}
-          title="Atualizar dados sem resetar filtros"
-          style={{
-            position: "absolute", top: 12, right: 12, zIndex: 1000,
-            background: refreshing ? "#1e293b" : "#1e293b",
-            border: "1px solid #334155", borderRadius: 8,
-            color: refreshing ? "#64748b" : "#94a3b8",
-            cursor: refreshing ? "default" : "pointer",
-            padding: "6px 12px", fontSize: 12, fontWeight: 600,
-            display: "flex", alignItems: "center", gap: 6,
-            transition: "all 0.2s",
-          }}
-        >
-          <span style={{ display: "inline-block", animation: refreshing ? "spin 1s linear infinite" : "none" }}>🔄</span>
-          {refreshing ? "Atualizando..." : "Atualizar dados"}
-        </button>
-      )}
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       <iframe
         ref={iframeRef}
         style={{ width: "100%", height: "100%", border: "none", display: loading ? "none" : "block" }}
