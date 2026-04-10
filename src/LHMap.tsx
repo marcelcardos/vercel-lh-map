@@ -140,7 +140,9 @@ export default function LHMap() {
         });
       }
 
-      const tableUpd2 = rows.length > 0 ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "") : "";
+      const tableUpd2 = rows.length > 0
+        ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "").replace("T", " ")
+        : "";
       const generatedAt = tableUpd2.length >= 16
         ? tableUpd2.slice(0, 16)
         : new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
@@ -181,9 +183,12 @@ export default function LHMap() {
       const trackingData = buildTrackingMap(trackingRows);
 
       // Use MAX(AUD_UPD_DTTM) from the table — shows when the pipeline last ran, not when browser fetched
-      const tableUpd = rows.length > 0 ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "") : "";
+      // BQ returns DATETIME as "YYYY-MM-DDTHH:MM:SS" — replace T with space so slice(11,16) gives "HH:MM"
+      const tableUpd = rows.length > 0
+        ? String((rows[0] as Record<string, unknown>).TABLE_LAST_UPD ?? "").replace("T", " ")
+        : "";
       const generatedAt = tableUpd.length >= 16
-        ? tableUpd.slice(0, 16)   // BQ returns "YYYY-MM-DD HH:MM:SS"
+        ? tableUpd.slice(0, 16)
         : new Date().toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 16);
 
       // Cache this result for instant date switching
