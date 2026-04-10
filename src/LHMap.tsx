@@ -7,7 +7,7 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function LoadingScreen({ step, dots }: { step: 1 | 2; dots: number }) {
+function LoadingScreen({ step, dots, progress }: { step: 1 | 2; dots: number; progress: number }) {
   const dotStr = ".".repeat(dots % 4);
   return (
     <div style={{
@@ -37,31 +37,28 @@ function LoadingScreen({ step, dots }: { step: 1 | 2; dots: number }) {
               }}>
                 {done ? "✓" : n}
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{
-                  fontSize: 13, fontWeight: active ? 700 : 400,
-                  color: done ? "#64748b" : active ? "#FFE600" : "#475569",
-                }}>
-                  {label}{active ? dotStr : ""}
-                </div>
-                {active && (
-                  <div style={{
-                    marginTop: 6, height: 4, background: "#1e293b", borderRadius: 99, overflow: "hidden",
-                  }}>
-                    <div style={{
-                      height: "100%", borderRadius: 99, background: "#FFE600",
-                      width: "40%",
-                      animation: "slide 1.4s ease-in-out infinite",
-                    }} />
-                  </div>
-                )}
+              <div style={{
+                fontSize: 13, fontWeight: active ? 700 : 400,
+                color: done ? "#64748b" : active ? "#FFE600" : "#475569",
+              }}>
+                {label}{active ? dotStr : ""}
               </div>
             </div>
           );
         })}
       </div>
 
-      <div style={{ fontSize: 11, color: "#334155", marginTop: 8 }}>
+      {/* Progress bar global */}
+      <div style={{ width: 340, height: 4, background: "#1e293b", borderRadius: 99, overflow: "hidden" }}>
+        <div style={{
+          height: "100%", borderRadius: 99,
+          background: progress >= 100 ? "#22c55e" : "#FFE600",
+          width: `${progress}%`,
+          transition: progress >= 100 ? "width 0.3s ease-in, background 0.3s" : "width 0.25s ease-out",
+        }} />
+      </div>
+
+      <div style={{ fontSize: 11, color: "#334155", marginTop: -8 }}>
         Consultando BigQuery — pode levar alguns minutos
       </div>
     </div>
@@ -69,10 +66,11 @@ function LoadingScreen({ step, dots }: { step: 1 | 2; dots: number }) {
 }
 
 export default function LHMap() {
-  const [loading, setLoading] = useState(false);
-  const [step, setStep]       = useState<1 | 2>(1);
-  const [dots, setDots]       = useState(0);
-  const [error, setError]     = useState<string | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [step, setStep]         = useState<1 | 2>(1);
+  const [dots, setDots]         = useState(0);
+  const [error, setError]       = useState<string | null>(null);
   const iframeRef      = useRef<HTMLIFrameElement>(null);
   const blobUrlRef     = useRef<string | null>(null);
   const lastDatesRef   = useRef<{ dateFrom: string; dateTo: string }>({ dateFrom: today(), dateTo: today() });
@@ -82,6 +80,14 @@ export default function LHMap() {
   useEffect(() => {
     if (!loading) return;
     const id = setInterval(() => setDots((d) => d + 1), 800);
+    return () => clearInterval(id);
+  }, [loading]);
+
+  // Fake progress: crawls asymptotically toward 88%, then jumps to 100% on complete
+  useEffect(() => {
+    if (!loading) { setProgress(0); return; }
+    setProgress(0);
+    const id = setInterval(() => setProgress((p) => p < 88 ? p + (88 - p) * 0.025 : p), 200);
     return () => clearInterval(id);
   }, [loading]);
 
@@ -174,6 +180,8 @@ export default function LHMap() {
           : msg || "Erro ao carregar dados."
       );
     } finally {
+      setProgress(100);
+      await new Promise((r) => setTimeout(r, 380));
       setLoading(false);
     }
   };
@@ -198,7 +206,7 @@ export default function LHMap() {
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative", background: "#0f0f1a" }}>
-      {loading && <LoadingScreen step={step} dots={dots} />}
+      {loading && <LoadingScreen step={step} dots={dots} progress={progress} />}
       {error && !loading && (
         <div style={{
           position: "absolute", inset: 0, zIndex: 9999,

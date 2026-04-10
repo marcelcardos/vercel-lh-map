@@ -219,6 +219,8 @@ export const HTML_TEMPLATE = `<!DOCTYPE html>
     font-family:inherit;
   }
   #ck-tooltip.show { opacity:1; }
+  @keyframes spin-refresh { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  #btnRefresh { display: inline-block; transform-origin: center; transition: color 0.2s; }
 </style>
 </head>
 <body>
@@ -3381,7 +3383,11 @@ try {
 // ── Refresh silencioso via postMessage do React ────────────────────────────
 function requestRefresh() {
   var btn = document.getElementById('btnRefresh');
-  if (btn) { btn.textContent = '↻'; btn.style.opacity = '0.4'; btn.style.pointerEvents = 'none'; }
+  if (btn) {
+    btn.style.color = '#3b82f6';
+    btn.style.animation = 'spin-refresh 0.8s linear infinite';
+    btn.style.pointerEvents = 'none';
+  }
   window.parent.postMessage({ type: 'LH_REFRESH' }, '*');
 }
 
@@ -3398,7 +3404,7 @@ window.addEventListener('message', function(e) {
     }
     // Re-habilita botão ↻
     var btn = document.getElementById('btnRefresh');
-    if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = ''; }
+    if (btn) { btn.style.color = ''; btn.style.animation = ''; btn.style.pointerEvents = ''; }
     // Mostra badge "Atualizado" por 3s
     var badge = document.getElementById('refresh-badge');
     if (badge) { badge.style.display = 'flex'; setTimeout(function(){ badge.style.display = 'none'; }, 3000); }
