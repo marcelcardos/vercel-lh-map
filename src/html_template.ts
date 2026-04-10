@@ -3116,7 +3116,7 @@ function selectCrisisRoute(routeId, idx) {
     showRoadRoute(r);
   }
 }
-// ── Toggle painel crise ───────────────────────────────────────────────────────
+// ── Toggle painel crise ───��───────────────────────────────────────────────────
 function toggleCrisis() {
   const panel = document.getElementById('crisis-panel');
   const btn   = document.getElementById('btnCrise');
@@ -3301,8 +3301,11 @@ try {
   var _nuEl = document.getElementById('next-ctrl');
   var _tsHdr = document.getElementById('ts');
   var _nuHdr = document.getElementById('next-update');
-  if (_tsEl) _tsEl.textContent = 'Atualizado: ' + GENERATED_AT.slice(11,16);
-  if (_tsHdr) { _tsHdr.textContent = 'Atualizado: ' + GENERATED_AT.slice(11,16); }
+  // Extrair hora de forma robusta (formato pt-BR: "dd/mm/yyyy, hh:mm" ou "dd/mm/yyyy hh:mm")
+  var _timeMatch = GENERATED_AT.match(/(\\d{1,2}):(\\d{2})(?::\\d{2})?\\s*$/);
+  var _genTime = _timeMatch ? _timeMatch[1].padStart(2,'0') + ':' + _timeMatch[2] : GENERATED_AT.slice(-5);
+  if (_tsEl) _tsEl.textContent = 'Atualizado: ' + _genTime;
+  if (_tsHdr) { _tsHdr.textContent = 'Atualizado: ' + _genTime; }
   try {
     var _d = new Date(GENERATED_AT.replace(' ','T'));
     _d.setMinutes(_d.getMinutes() + 15);
