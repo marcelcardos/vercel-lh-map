@@ -62,7 +62,7 @@ function LoadingScreen({ step, dots }: { step: 1 | 2; dots: number }) {
       </div>
 
       <div style={{ fontSize: 11, color: "#334155", marginTop: 8 }}>
-        Consultando BigQuery — pode levar até 1 min
+        Consultando BigQuery — pode levar alguns minutos
       </div>
     </div>
   );
